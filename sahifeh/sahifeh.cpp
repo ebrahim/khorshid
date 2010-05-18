@@ -6,6 +6,8 @@
 #define ENGLISH_START 0x020181
 #define ENGLISH_END 0x01007A
 
+// TODO: Separate two consecutive joining characters which should be non-joined using a JWNJ
+
 int main(int argc, const char* argv[])
 {
 	if (argc > 1 && freopen(argv[1], "r", stdin) == NULL)
