@@ -5,8 +5,15 @@
 #define NEW_PAGE 0x000182
 #define ENGLISH_START 0x020181
 #define ENGLISH_END 0x01007A
+#define ZWNJ "\xE2\x80\x8C"
 
-// TODO: Separate two consecutive joining characters which should be non-joined using a JWNJ
+enum CharJoining		// What a char does while it shouldn't
+{
+	JOINS_NONE = 0,		// Leave it alone. It doesn't join badly.
+	JOINS_PREV = 1,		// If previous has JOINS_NEXT, it accepts
+	JOINS_NEXT = 2,		// Tries to join the next character, while it shouldn't
+	JOINS_BOTH = JOINS_PREV | JOINS_NEXT,
+};
 
 int main(int argc, const char* argv[])
 {
@@ -17,40 +24,49 @@ int main(int argc, const char* argv[])
 	}
 	const char* map[256] = { NULL };
 	uint8_t map_size[256] = { 0 };
+	CharJoining map_joining[256] = { JOINS_NONE };
 	for (int i = 0; i < 256; ++i)
 		switch (i)
 		{
 			case 0x01:		// که
 				map[i] = "\xDA\xA9\xD9\x87";
 				map_size[i] = 4;
+				map_joining[i] = JOINS_BOTH;
 				break;
 			case 0x02:		// به
 				map[i] = "\xD8\xA8\xD9\x87";
 				map_size[i] = 4;
+				map_joining[i] = JOINS_BOTH;
 				break;
 			case 0x03:		// را
 				map[i] = "\xD8\xB1\xD8\xA7";
 				map_size[i] = 4;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0x04:		// در
 				map[i] = "\xD8\xAF\xD8\xB1";
 				map_size[i] = 4;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0x05:		// این
 				map[i] = "\xD8\xA7\xDB\x8C\xD9\x86";
 				map_size[i] = 6;
+				map_joining[i] = JOINS_BOTH;
 				break;
 			case 0x06:		// از
 				map[i] = "\xD8\xA7\xD8\xB2";
 				map_size[i] = 4;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0x07:		// است
 				map[i] = "\xD8\xA7\xD8\xB3\xD8\xAA";
 				map_size[i] = 6;
+				map_joining[i] = JOINS_BOTH;
 				break;
 			case 0x08:		// ما
 				map[i] = "\xD9\x85\xD8\xA7";
 				map_size[i] = 4;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0x20:		// فاصله
 				map[i] = " ";
@@ -181,7 +197,7 @@ int main(int argc, const char* argv[])
 				map[i] = "\xD9\x8F";
 				map_size[i] = 2;
 				break;
-			case 0x9A:		// الف مقصوره مفتوح
+			case 0x9A:		// الف مقصوره منصوب
 				map[i] = "\xD9\xB0";
 				map_size[i] = 2;
 				break;
@@ -201,7 +217,7 @@ int main(int argc, const char* argv[])
 				map[i] = "\xD9\x8C";
 				map_size[i] = 2;
 				break;
-			case 0xA2:		// تشدید مفتوح
+			case 0xA2:		// تشدید منصوب
 				map[i] = "\xD9\x91\xD9\x8E";
 				map_size[i] = 4;
 				break;
@@ -215,7 +231,7 @@ int main(int argc, const char* argv[])
 				break;
 			case 0xA8:		// تشدید و الف مقصوره
 				map[i] = "\xD9\x91\xD9\xB0";
-				map_size[i] = 0;		// الف عمداً حذف شد
+				map_size[i] = 0;		// عمداً حذف شد
 				break;
 			case 0xA9:		// تشدید و تنوین نصب
 				map[i] = "\xD9\x91\xD9\x8B";
@@ -238,11 +254,13 @@ int main(int argc, const char* argv[])
 				map_size[i] = 2;
 				break;
 			case 0xB0:		// آ جدا
+				map_joining[i] = JOINS_PREV;
 			case 0xB1:		// آ آخری (مثل الآن)
 				map[i] = "\xD8\xA2";
 				map_size[i] = 2;
 				break;
 			case 0xB2:		// الف جدا
+				map_joining[i] = JOINS_PREV;
 			case 0xB3:		// الف آخر
 				map[i] = "\xD8\xA7";
 				map_size[i] = 2;
@@ -251,12 +269,14 @@ int main(int argc, const char* argv[])
 				map[i] = "\xD8\xA1";
 				map_size[i] = 2;
 				break;
-			case 0xB5:		// الف و همزه مفتوح اول
-			case 0xB6:		// الف و همزه مفتوح آخر
+			case 0xB5:		// الف و همزه منصوب اول
+				map_joining[i] = JOINS_PREV;
+			case 0xB6:		// الف و همزه منصوب آخر
 				map[i] = "\xD8\xA3";
 				map_size[i] = 2;
 				break;
 			case 0xB7:		// ﺎﻠﻓ ﻭ ﻪﻣﺰﻫ ﻡکﺱﻭﺭ ﺍﻮﻟ
+				map_joining[i] = JOINS_PREV;
 			case 0xB8:		// ﺎﻠﻓ ﻭ ﻪﻣﺰﻫ ﻡکﺱﻭﺭ آخر
 				map[i] = "\xD8\xA5";
 				map_size[i] = 2;
@@ -264,176 +284,308 @@ int main(int argc, const char* argv[])
 			case 0xB9:		// ؤ آخر
 				map[i] = "\xD8\xA4";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xBA:		// ئ آخر
 				map[i] = "\xD8\xA6";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
 				break;
-			case 0xBC:		// همزه اول
+			case 0xBC:		// ئ اول
 				map[i] = "\xD8\xA6";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xBD:		// ب آخر
+				map[i] = "\xD8\xA8";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xBE:		// ب اول
 				map[i] = "\xD8\xA8";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xBF:		// پ آخر
-			case 0xC0:		// پ وسط
 				map[i] = "\xD9\xBE";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
+			case 0xC0:		// پ اول
+				map[i] = "\xD9\xBE";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xC1:		// ت آخر
-			case 0xC2:		// ت وسط
 				map[i] = "\xD8\xAA";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
+			case 0xC2:		// ت اول
+				map[i] = "\xD8\xAA";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xC3:		// ة جدا
 				map[i] = "\xD8\xA9";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xC4:		// ث آخر
+				map[i] = "\xD8\xAB";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xC5:		// ث اول
 				map[i] = "\xD8\xAB";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xC6:		// جیم آخر
+				map[i] = "\xD8\xAC";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xC7:		// جیم اول
 				map[i] = "\xD8\xAC";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xC8:		// چ آخر
+				map[i] = "\xDA\x86";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xC9:		// چ اول
 				map[i] = "\xDA\x86";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xCA:		// ح آخر
+				map[i] = "\xD8\xAD";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xCB:		// ح اول
 				map[i] = "\xD8\xAD";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xCC:		// خ آخر
+				map[i] = "\xD8\xAE";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xCD:		// خ اول و وسط
 				map[i] = "\xD8\xAE";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xCE:		// دال جدا و آخر
 				map[i] = "\xD8\xAF";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xCF:		// ذال جدا
 				map[i] = "\xD8\xB0";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xD0:		// ر آخر
 				map[i] = "\xD8\xB1";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xD1:		// ز جدا و آخر
 				map[i] = "\xD8\xB2";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xD2:		// ژ آخر
 				map[i] = "\xDA\x98";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xD3:		// سین آخر
+				map[i] = "\xD8\xB3";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xD4:		// سین اول
 				map[i] = "\xD8\xB3";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xD5:		// شین جدا
+				map[i] = "\xD8\xB4";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xD6:		// شین اول و وسط
 				map[i] = "\xD8\xB4";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xD7:		// صاد آخر
+				map[i] = "\xD8\xB5";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xD8:		// صاد وسط
 				map[i] = "\xD8\xB5";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xD9:		// ضاد آخر
+				map[i] = "\xD8\xB6";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xDA:		// ضاد اول
 				map[i] = "\xD8\xB6";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xDB:		// طای اول
 				map[i] = "\xD8\xB7";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xDC:		// ظای اول
 				map[i] = "\xD8\xB8";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xDD:		// عین جدا
 			case 0xDE:		// عین آخر
+				map[i] = "\xD8\xB9";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xDF:		// عین اول
 			case 0xE1:		// عین وسط
 				map[i] = "\xD8\xB9";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xE2:		// غین جدا
 			case 0xE3:		// غین آخر
+				map[i] = "\xD8\xBA";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xE4:		// غین اول
 			case 0xE5:		// غین وسط
 				map[i] = "\xD8\xBA";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xE6:		// ف آخر
+				map[i] = "\xD9\x81";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xE7:		// ف وسط
 				map[i] = "\xD9\x81";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xE8:		// قاف جدا
+				map[i] = "\xD9\x82";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xE9:		// قاف اول
 				map[i] = "\xD9\x82";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xEA:		// کاف آخر
+				map[i] = "\xDA\xA9";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xEB:		// کاف وسط
 				map[i] = "\xDA\xA9";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xEC:		// گاف آخر
+				map[i] = "\xDA\xAF";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xED:		// گاف اول
 				map[i] = "\xDA\xAF";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xEE:		// لام جدا
+				map[i] = "\xD9\x84";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xF0:		// لام اول و وسط
 				map[i] = "\xD9\x84";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xF1:		// میم جدا
+				map[i] = "\xD9\x85";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xF2:		// میم اول
 				map[i] = "\xD9\x85";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xF3:		// نون جدا
+				map[i] = "\xD9\x86";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xF4:		// نون اول
 				map[i] = "\xD9\x86";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
+				break;
+			case 0xF6:		// ه آخر با ی ربط
+				map[i] = "\xD9\x87\xD9\x94";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
 				break;
 			case 0xF5:		// ه آخر و جدا
-			case 0xF6:		// ه آخر با ی ربط
+				map[i] = "\xD9\x87";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xF7:		// ه اول
 				map[i] = "\xD9\x87";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xF8:		// واو آخر و جدا
 				map[i] = "\xD9\x88";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xF9:		// ی جدا
 			case 0xFB:		// ی آخر
+				map[i] = "\xDB\x8C";
+				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
+				break;
 			case 0xFD:		// ی اول و وسط
 				map[i] = "\xDB\x8C";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_PREV;
 				break;
 			case 0xFA:		// ي عربی جدا
 			case 0xFC:		// ي عربی آخر
 				map[i] = "\xD9\x8A";
 				map_size[i] = 2;
+				map_joining[i] = JOINS_BOTH;
 				break;
 			default:
 				break;
@@ -516,6 +668,7 @@ int main(int argc, const char* argv[])
 
 	bool english = false;
 	const uint8_t* data = buf;
+	CharJoining prev_joining = JOINS_NONE;
 	while (size > 0)
 	{
 		if (size > 6)
@@ -534,14 +687,17 @@ int main(int argc, const char* argv[])
 					data += 2;
 					size -= 2;
 					printf("\n=================== volume #%d page #%d ====================\n", volume, page);
+					prev_joining = JOINS_NONE;
 					break;
 				}
 				case ENGLISH_START:
 					english = true;
-					fwrite("\xE2\x80\xAE", 1, 3, stdout);
+					fwrite("\xE2\x80\xAE", 1, 3, stdout);		// Write a LRO (Right-to-Left Override), because English chars are in reverse order!
+					prev_joining = JOINS_NONE;
 					break;
 				case ENGLISH_END:
 					english = false;
+					prev_joining = JOINS_NONE;
 					break;
 				default:
 					data -= 3;
@@ -592,11 +748,14 @@ int main(int argc, const char* argv[])
 						printf(" !!! ناشناس [%#.2x] !!! ", *data);
 						break;
 				}
+				prev_joining = JOINS_NONE;
 				break;
 			case 0x80:		// اتمام یک بخش؟
 				printf(" !!! پایان !!! ");
+				prev_joining = JOINS_NONE;
 				break;
 			default:
+				CharJoining my_joining = JOINS_NONE;
 				const char* to = NULL;
 				uint16_t to_size = 0;
 				if (english)
@@ -611,14 +770,20 @@ int main(int argc, const char* argv[])
 				{
 					to = map[byte];
 					to_size = map_size[byte];
+					my_joining = map_joining[byte];
 				}
 				if (to_size)
+				{
+					if ((prev_joining & JOINS_NEXT) && (my_joining & JOINS_PREV))
+						fwrite(ZWNJ, 1, sizeof(ZWNJ) - 1, stdout);
 					fwrite(to, 1, to_size, stdout);
+				}
 				else if (!to)
 				{
 					printf("<[%#.2x]>", byte);
 					fprintf(stderr, "unknown byte: %#.2x\n", byte);
 				}
+				prev_joining = my_joining;
 				break;
 		}
 		++data;
