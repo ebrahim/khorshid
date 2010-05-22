@@ -1,3 +1,4 @@
+#include <string>
 #include <cstdio>
 #include <stdint.h>
 
@@ -6,6 +7,33 @@
 #define ENGLISH_START 0x020181
 #define ENGLISH_END 0x01007A
 #define ZWNJ "\xE2\x80\x8C"
+#define RLM "\xE2\x80\x8F"
+
+static const char* header = ""
+	"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\"\n"
+	"    \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n"
+	"<html dir=\"rtl\" xmlns=\"http://www.w3.org/1999/xhtml\">\n"
+	"<head>\n"
+	"<title>صحیفهٔ نور حضرت امام خمینی</title>\n"
+	"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n"
+	"</head>\n"
+	"<body>\n"
+	"<div align=\"center\">بسم الله الرحمن الرحیم</div>\n";
+static const char* footer = "</body>\n</html>\n";
+
+static const char* digits_fa[10] =
+{
+	"\xDB\xB0",		// ۰
+	"\xDB\xB1",		// ۱
+	"\xDB\xB2",		// ۲
+	"\xDB\xB3",		// ۳
+	"\xDB\xB4",		// ۴
+	"\xDB\xB5",		// ۵
+	"\xDB\xB6",		// ۶
+	"\xDB\xB7",		// ۷
+	"\xDB\xB8",		// ۸
+	"\xDB\xB9",		// ۹
+};
 
 enum CharJoining		// What a char does while it shouldn't
 {
@@ -126,12 +154,12 @@ int main(int argc, const char* argv[])
 				break;
 			case 0x00:		// سر خط؟
 			case 0x75:		// سر خط
-				map[i] = "\n";
-				map_size[i] = 1;
+				map[i] = "<br />\n";
+				map_size[i] = 7;
 				break;
 			case 0x76:		// tab
-				map[i] = "\t";
-				map_size[i] = 1;
+				map[i] = "&nbsp;&nbsp;&nbsp;&nbsp;";
+				map_size[i] = 24;
 				break;
 			case 0x77:		// /
 				map[i] = "/";
@@ -140,10 +168,6 @@ int main(int argc, const char* argv[])
 			case 0x7A:		// *
 				map[i] = "*";
 				map_size[i] = 1;
-				break;
-			case 0x85:		// خط افقی (برای جدا کردن پاورقی)
-				map[i] = "--------------------";
-				map_size[i] = 20;
 				break;
 			case 0x8D:		// ۰
 				map[i] = "\xDB\xB0";
@@ -590,7 +614,7 @@ int main(int argc, const char* argv[])
 			default:
 				break;
 		}
-	char map_en[256] = { NULL };
+	char map_en[256] = { 0 };
 	for (int i = 0; i < 256; ++i)
 		switch (i)
 		{
@@ -663,12 +687,16 @@ int main(int argc, const char* argv[])
 				break;
 		}
 
+	puts(header);
+
 	uint8_t* buf = new uint8_t[MAX_SIZE];
 	size_t size = fread(buf, 1, MAX_SIZE, stdin);
 
 	bool english = false;
+	bool span = false;
 	const uint8_t* data = buf;
 	CharJoining prev_joining = JOINS_NONE;
+	std::string ltr_string;		// Used to reverse numbers and English parts
 	while (size > 0)
 	{
 		if (size > 6)
@@ -686,13 +714,18 @@ int main(int argc, const char* argv[])
 					uint16_t page = *(uint16_t*) data;
 					data += 2;
 					size -= 2;
-					printf("\n=================== volume #%d page #%d ====================\n", volume, page);
+					//printf("\n<hr /> جلد %d صفحه %d <hr />\n", volume, page);
+					printf("\n<hr /> جلد %s%s صفحه %s%s%s <hr />\n",
+							volume < 10 ? "" : digits_fa[volume / 10],
+							digits_fa[volume % 10],
+							page < 100 ? "" : digits_fa[page / 100],
+							page < 10 ? "" : digits_fa[(page % 100) / 10],
+							digits_fa[page % 10]);
 					prev_joining = JOINS_NONE;
 					break;
 				}
 				case ENGLISH_START:
 					english = true;
-					fwrite("\xE2\x80\xAE", 1, 3, stdout);		// Write a LRO (Right-to-Left Override), because English chars are in reverse order!
 					prev_joining = JOINS_NONE;
 					break;
 				case ENGLISH_END:
@@ -715,43 +748,53 @@ int main(int argc, const char* argv[])
 				switch (*data)
 				{
 					case 0x01:		// عنوان
-						printf(" !!! عنوان !!! ");
+						puts("<span class=\"title\">");
 						break;
 					case 0x03:		// حدیث
-						printf(" !!! حدیث !!! ");
+						puts("<span class=\"hadith\">");
 						break;
 					case 0x04:		// آیه
-						printf(" !!! آیه !!! ");
+						puts("<span class=\"aya\">");
 						break;
 					case 0x05:		// شعر
-						printf(" !!! شعر !!! ");
+						puts("<span class=\"poem\">");
 						break;
 					case 0x08:		// ترجمه
-						printf(" !!! ترجمه !!! ");
+						puts("<span class=\"translation\">");
 						break;
 					case 0x0B:		// پاورقی
-						printf(" !!! پاورقی !!! ");
+						puts("<span class=\"footnote\">");
 						break;
 					case 0x0C:		// آیه در پاورقی
-						printf(" !!! آیه در پاورقی !!! ");
+						puts("<span class=\"footnote_aya\">");
 						break;
 					case 0x0D:		// حدیث در پاورقی
-						printf(" !!! حدیث در پاورقی !!! ");
+						puts("<span class=\"footnote_hadith\">");
 						break;
 					case 0x0E:		// شعر در پاورقی
-						printf(" !!! شعر در پاورقی !!! ");
+						puts("<span class=\"footnote_poem\">");
 						break;
 					case 0x0F:		// توضیح در پاورقی
-						printf(" !!! توضیح در پاورقی !!! ");
+						puts("<span class=\"footnote_comment\">");
 						break;
 					default:
-						printf(" !!! ناشناس [%#.2x] !!! ", *data);
+						printf("<span class=\"unknown_%#.2x\">\n", *data);
+						fprintf(stderr, "unknown formatting: %#.2x\n", *data);
 						break;
 				}
+				span = true;
 				prev_joining = JOINS_NONE;
 				break;
 			case 0x80:		// اتمام یک بخش؟
-				printf(" !!! پایان !!! ");
+				if (span)
+				{
+					puts("</span>");
+					span = false;
+				}
+				prev_joining = JOINS_NONE;
+				break;
+			case 0x85:		// خط افقی (برای جدا کردن پاورقی)
+				puts("<hr class=\"hr_footnote\" />");
 				prev_joining = JOINS_NONE;
 				break;
 			default:
@@ -774,13 +817,24 @@ int main(int argc, const char* argv[])
 				}
 				if (to_size)
 				{
-					if ((prev_joining & JOINS_NEXT) && (my_joining & JOINS_PREV))
-						fwrite(ZWNJ, 1, sizeof(ZWNJ) - 1, stdout);
-					fwrite(to, 1, to_size, stdout);
+					if (english || (0x8D <= byte && byte <= 0x96))
+						ltr_string = std::string(to, to_size) + ltr_string;
+					else
+					{
+						if (!ltr_string.empty())
+						{
+							ltr_string += RLM;
+							fwrite(ltr_string.data(), 1, ltr_string.size(), stdout);
+							ltr_string.clear();
+						}
+						if ((prev_joining & JOINS_NEXT) && (my_joining & JOINS_PREV))
+							fwrite(ZWNJ, 1, sizeof(ZWNJ) - 1, stdout);
+						fwrite(to, 1, to_size, stdout);
+					}
 				}
 				else if (!to)
 				{
-					printf("<[%#.2x]>", byte);
+					printf("<!-- unknown byte [%#.2x] -->", byte);
 					fprintf(stderr, "unknown byte: %#.2x\n", byte);
 				}
 				prev_joining = my_joining;
@@ -789,6 +843,8 @@ int main(int argc, const char* argv[])
 		++data;
 		--size;
 	}
+	
+	puts(footer);
 
 	delete [] buf;
 	return 0;
