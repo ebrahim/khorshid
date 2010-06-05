@@ -694,7 +694,7 @@ int main(int argc, const char* argv[])
 	size_t size = fread(buf, 1, MAX_SIZE, stdin);
 
 	bool english = false;
-	bool span = false;
+	int span = 0;
 	const uint8_t* data = buf;
 	CharJoining prev_joining = JOINS_NONE;
 	std::string ltr_string;		// Used to reverse numbers and English parts
@@ -783,14 +783,14 @@ int main(int argc, const char* argv[])
 						fprintf(stderr, "unknown formatting: %#.2x\n", *data);
 						break;
 				}
-				span = true;
+				++span;
 				prev_joining = JOINS_NONE;
 				break;
 			case 0x80:		// اتمام یک بخش؟
-				if (span)
+				if (span > 0)
 				{
 					puts("</span>");
-					span = false;
+					--span;
 				}
 				prev_joining = JOINS_NONE;
 				break;
