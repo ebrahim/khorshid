@@ -1,8 +1,26 @@
 In the name of Allah
 
-This is a try to extract data from Sahifeh software of NoorSoft.
+This is an effort to extract data from Imam Khomeini's Sahifeh software of
+NoorSoft.
 
 Look at Data/Nur00064.Cdf. Now you should know that charset tool should be run
 on Data/Nur00016.Cdf, and sahifeh tool on Data/Nur00085.Cdf.
 
+Usage: sahifeh [input-file]
+
 If you love your eyes, redirect output of sahifeh tool to a file!
+
+Output is an XHTML file beautifiable using some CSS. These are the CSS classes:
+
+title: Titles
+hadith: Hadithes in main text
+aya: Ayas of Quran in main text
+poem: Poem snippets in main text
+comment: Comments by somebody other that Imam Khomeini in main text
+footnote: Footnotes
+footnote_aya: same as 'aya', but in footnotes
+footnote_hadith: same as 'hadith', but in footnotes
+footnote_poem: same as 'poem', but in footnotes
+footnote_comment: Same as 'comment', but in footnotes
+
+If you create some nice CSS, please contribute it to the project.

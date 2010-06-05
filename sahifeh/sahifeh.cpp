@@ -761,7 +761,7 @@ int main(int argc, const char* argv[])
 						puts("<span class=\"poem\">");
 						break;
 					case 0x08:		// ترجمه
-						puts("<span class=\"translation\">");
+						puts("<span class=\"comment\">");
 						break;
 					case 0x0B:		// پاورقی
 						puts("<span class=\"footnote\">");
